@@ -11,8 +11,15 @@ class Plane extends Actor with ActorLogging {
   import Plane._
   import EventSource._
 
-  val altimeter = context.actorOf(Props[Altimeter], "Altimeter")
+  val cfgstr = "zzz.akka.avionics.flightcrew"
+  val altimeter = context.actorOf(Props(Altimeter()), "Altimeter")
   val controls = context.actorOf(Props(new ControlSurfaces(altimeter)), "ControlSurfaces")
+
+  val config = context.system.settings.config
+  val pilot = context.actorOf(Props[Pilot],config.getString(s"$cfgstr.pilotName"))
+  val copilot = context.actorOf(Props[CoPilot],config.getString(s"$cfgstr.copilotName"))
+  val autopilot = context.actorOf(Props[AutoPilot], "AutoPilot")
+  val flightAttendant = context.actorOf(Props(LeadFlightAttendant()), config.getString(s"$cfgstr.leadAttendantName"))
 
   def receive = {
     case GiveMeControl =>
@@ -24,6 +31,7 @@ class Plane extends Actor with ActorLogging {
 
   override def preStart() = {
     altimeter ! RegisterListener(self)
+    List(pilot, copilot) foreach { _ ! Pilot.ReadyToGo }
   }
 }
 
